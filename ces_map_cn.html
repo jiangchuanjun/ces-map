@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>文化生态服务地点标注</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<style>
+  /* 使用系统字体，避免 Google Fonts 在国内无法加载 */
+
+  :root {
+    --ink: #1a1a2e;
+    --paper: #f5f0e8;
+    --accent: #2d6a4f;
+    --accent2: #b5838d;
+    --gold: #c9a84c;
+    --light-border: rgba(45,106,79,0.2);
+    --c1: #e76f51; --c2: #2a9d8f; --c3: #8338ec;
+    --c4: #fb8500; --c5: #3a86ff; --c6: #c77dff; --c7: #06d6a0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 10px 14px 8px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  header h1 {
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #f5f0e8;
+  }
+  header p {
+    font-size: 10.5px;
+    color: rgba(245,240,232,0.65);
+    margin-top: 2px;
+    font-weight: 300;
+  }
+  .step-badge {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: var(--gold);
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Service Selector ── */
+  #service-bar {
+    background: #fff;
+    border-bottom: 1.5px solid var(--light-border);
+    padding: 8px 10px 6px;
+    flex-shrink: 0;
+  }
+  #service-bar .bar-label {
+    font-size: 10px;
+    color: #888;
+    margin-bottom: 5px;
+    letter-spacing: 0.03em;
+  }
+  #service-tabs {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  #service-tabs::-webkit-scrollbar { display: none; }
+
+  .stab {
+    flex-shrink: 0;
+    border: 1.5px solid currentColor;
+    background: transparent;
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    cursor: pointer;
+    transition: all 0.18s;
+    position: relative;
+  }
+  .stab.active {
+    color: #fff !important;
+    font-weight: 500;
+  }
+  .stab .dot-count {
+    display: inline-block;
+    background: rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 0 5px;
+    margin-left: 3px;
+    font-size: 10px;
+  }
+  .stab.active .dot-count { background: rgba(255,255,255,0.4); }
+
+  /* ── Map ── */
+  #map {
+    flex: 1;
+    cursor: crosshair;
+    position: relative;
+  }
+
+  /* ── Hint ── */
+  #map-hint {
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26,26,46,0.82);
+    color: #f5f0e8;
+    font-size: 11.5px;
+    padding: 7px 16px;
+    border-radius: 20px;
+    z-index: 1000;
+    pointer-events: none;
+    white-space: nowrap;
+    backdrop-filter: blur(4px);
+    transition: opacity 0.4s;
+  }
+  #map-hint.hidden { opacity: 0; }
+
+  /* ── Bottom bar ── */
+  #bottom-bar {
+    background: #fff;
+    border-top: 1.5px solid var(--light-border);
+    padding: 8px 12px;
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    align-items: center;
+  }
+  #btn-undo {
+    background: transparent;
+    border: 1.5px solid #ccc;
+    color: #666;
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  #btn-undo:hover { border-color: #999; color: #333; }
+  #btn-generate {
+    flex: 1;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 0;
+    font-size: 13px;
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: background 0.18s;
+  }
+  #btn-generate:hover { background: #235a42; }
+  #btn-generate:disabled { background: #aaa; cursor: default; }
+
+  /* ── Result Modal ── */
+  #result-modal {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(26,26,46,0.6);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(3px);
+  }
+  #result-modal.show { display: flex; }
+  .modal-card {
+    background: var(--paper);
+    border-radius: 16px;
+    padding: 22px 20px 18px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal-card h2 {
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
+    font-size: 16px;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .modal-card .sub {
+    font-size: 11.5px;
+    color: #888;
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+  #result-code {
+    background: #fff;
+    border: 1.5px solid var(--light-border);
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 11.5px;
+    font-family: 'Courier New', monospace;
+    color: var(--ink);
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 14px;
+    user-select: all;
+  }
+  .modal-btns { display: flex; gap: 8px; }
+  #btn-copy {
+    flex: 1;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+  }
+  #btn-close-modal {
+    background: transparent;
+    border: 1.5px solid #ccc;
+    color: #666;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    cursor: pointer;
+  }
+  .copy-success { background: #2a9d8f !important; }
+
+  /* ── Legend ── */
+  .leaflet-legend {
+    background: rgba(255,255,255,0.92);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 10.5px;
+    line-height: 1.8;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1.5px solid rgba(0,0,0,0.2);
+  }
+
+  /* ── Info popup ── */
+  .leaflet-popup-content-wrapper {
+    border-radius: 10px !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important;
+  }
+  .leaflet-popup-content { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif; font-size: 12px; }
+  .popup-del {
+    display: inline-block;
+    margin-top: 4px;
+    color: #e76f51;
+    cursor: pointer;
+    font-size: 11px;
+    text-decoration: underline;
+  }
+
+  /* progress */
+  #progress-bar {
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--gold));
+    transition: width 0.4s;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📍 文化生态服务地点标注</h1>
+  <p>请在地图上点击，标注您珍视的地点</p>
+  <div class="step-badge" id="total-count">0 / 7</div>
+</header>
+
+<div id="progress-bar" style="width:0%"></div>
+
+<div id="service-bar">
+  <div class="bar-label">▸ 选择服务类型，再在地图上点击标注（每类最多3个）</div>
+  <div id="service-tabs"></div>
+</div>
+
+<div id="map">
+  <div id="map-hint">请先选择上方的文化服务类型</div>
+</div>
+
+<div id="bottom-bar">
+  <button id="btn-undo">↩ 撤销</button>
+  <button id="btn-generate" disabled>生成坐标码 →</button>
+</div>
+
+<!-- Result Modal -->
+<div id="result-modal">
+  <div class="modal-card">
+    <h2>✅ 坐标已生成</h2>
+    <p class="sub">请长按下方代码全选，复制后粘贴到问卷对应文本框中。</p>
+    <div id="result-code"></div>
+    <div class="modal-btns">
+      <button id="btn-copy">📋 一键复制</button>
+      <button id="btn-close-modal">返回地图</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SERVICES = [
+  { id:'C1', label:'美学',    color:'#e76f51', emoji:'🌄' },
+  { id:'C2', label:'教育',    color:'#2a9d8f', emoji:'📚' },
+  { id:'C3', label:'文化遗产', color:'#8338ec', emoji:'🏛️' },
+  { id:'C4', label:'消遣娱乐', color:'#fb8500', emoji:'🎡' },
+  { id:'C5', label:'康养',    color:'#3a86ff', emoji:'🌿' },
+  { id:'C6', label:'宗教精神', color:'#c77dff', emoji:'⛩️' },
+  { id:'C7', label:'科研',    color:'#06d6a0', emoji:'🔬' },
+];
+
+const MAX_PER_TYPE = 3;
+let currentService = null;
+let allMarkers = []; // {serviceId, marker, latlng}
+
+// ── Build service tabs ──
+const tabsEl = document.getElementById('service-tabs');
+SERVICES.forEach(s => {
+  const btn = document.createElement('button');
+  btn.className = 'stab';
+  btn.id = 'tab-' + s.id;
+  btn.style.color = s.color;
+  btn.style.borderColor = s.color;
+  btn.innerHTML = `${s.emoji} ${s.label} <span class="dot-count" id="cnt-${s.id}">0</span>`;
+  btn.addEventListener('click', () => selectService(s));
+  tabsEl.appendChild(btn);
+});
+
+function selectService(s) {
+  currentService = s;
+  document.querySelectorAll('.stab').forEach(b => {
+    b.classList.remove('active');
+    b.style.background = 'transparent';
+    b.style.color = SERVICES.find(x => 'tab-'+x.id === b.id)?.color || '#333';
+  });
+  const tab = document.getElementById('tab-' + s.id);
+  tab.classList.add('active');
+  tab.style.background = s.color;
+  tab.style.color = '#fff';
+  updateHint(`正在标注【${s.emoji} ${s.label}】，点击地图选择地点`);
+}
+
+// ── Init map ──
+const map = L.map('map', {
+  center: [39.5, 116.5],
+  zoom: 7,
+  zoomControl: true,
+});
+
+// 高德地图瓦片（国内稳定，无需 API Key）
+// 注意：高德使用 GCJ-02 坐标系，坐标码输出仍为标准 WGS-84 经纬度
+L.tileLayer('https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7', {
+  attribution: '© 高德地图',
+  subdomains: ['1','2','3','4'],
+  maxZoom: 18,
+}).addTo(map);
+
+// Legend
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = () => {
+  const div = L.DomUtil.create('div', 'leaflet-legend');
+  div.innerHTML = SERVICES.map(s =>
+    `<div class="legend-item"><div class="legend-dot" style="background:${s.color}"></div>${s.emoji} ${s.label}</div>`
+  ).join('');
+  return div;
+};
+legend.addTo(map);
+
+// ── Map click ──
+map.on('click', e => {
+  if (!currentService) {
+    updateHint('❗ 请先在上方选择文化服务类型');
+    flashHint();
+    return;
+  }
+  const count = allMarkers.filter(m => m.serviceId === currentService.id).length;
+  if (count >= MAX_PER_TYPE) {
+    updateHint(`【${currentService.label}】最多标注 ${MAX_PER_TYPE} 个地点`);
+    flashHint();
+    return;
+  }
+  addMarker(currentService, e.latlng);
+});
+
+function addMarker(service, latlng) {
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="
+      width:28px;height:28px;
+      background:${service.color};
+      border:2.5px solid #fff;
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);
+      box-shadow:0 2px 6px rgba(0,0,0,0.28);
+    "></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor: [0, -30],
+  });
+
+  const marker = L.marker(latlng, { icon }).addTo(map);
+  const idx = allMarkers.filter(m => m.serviceId === service.id).length + 1;
+
+  marker.bindPopup(`
+    <b>${service.emoji} ${service.label} #${idx}</b><br>
+    <span style="color:#888;font-size:11px">${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}</span><br>
+    <span class="popup-del" onclick="removeMarker('${Date.now() + Math.random()}')">🗑 删除此点</span>
+  `);
+
+  const id = 'mk_' + Date.now() + '_' + Math.random();
+  marker._customId = id;
+  marker.getPopup()._source._customId = id;
+
+  // patch delete
+  marker.on('popupopen', () => {
+    const el = document.querySelector('.popup-del');
+    if (el) el.onclick = () => removeMarkerById(id);
+  });
+
+  allMarkers.push({ id, serviceId: service.id, marker, latlng });
+  updateUI();
+}
+
+function removeMarkerById(id) {
+  const idx = allMarkers.findIndex(m => m.id === id);
+  if (idx === -1) return;
+  allMarkers[idx].marker.remove();
+  allMarkers.splice(idx, 1);
+  updateUI();
+}
+
+document.getElementById('btn-undo').addEventListener('click', () => {
+  if (allMarkers.length === 0) return;
+  const last = allMarkers.pop();
+  last.marker.remove();
+  updateUI();
+});
+
+function updateUI() {
+  SERVICES.forEach(s => {
+    const cnt = allMarkers.filter(m => m.serviceId === s.id).length;
+    document.getElementById('cnt-' + s.id).textContent = cnt;
+  });
+  const total = allMarkers.length;
+  document.getElementById('total-count').textContent = `${total} 个`;
+  const pct = Math.min(100, (total / (SERVICES.length * 2)) * 100);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('btn-generate').disabled = total === 0;
+}
+
+function updateHint(text) {
+  const h = document.getElementById('map-hint');
+  h.textContent = text;
+  h.classList.remove('hidden');
+}
+function flashHint() {
+  const h = document.getElementById('map-hint');
+  h.style.background = 'rgba(231,111,81,0.88)';
+  setTimeout(() => { h.style.background = ''; }, 1200);
+}
+
+// Auto-hide hint after first click
+map.on('click', () => {
+  if (currentService) {
+    setTimeout(() => {
+      document.getElementById('map-hint').classList.add('hidden');
+    }, 2000);
+  }
+});
+
+// ── Generate result ──
+document.getElementById('btn-generate').addEventListener('click', () => {
+  if (allMarkers.length === 0) return;
+
+  const lines = [];
+  SERVICES.forEach(s => {
+    const pts = allMarkers.filter(m => m.serviceId === s.id);
+    if (pts.length > 0) {
+      const coords = pts.map((p, i) =>
+        `${s.id}P${i+1}:${p.latlng.lat.toFixed(5)},${p.latlng.lng.toFixed(5)}`
+      ).join(' | ');
+      lines.push(`【${s.label}】${coords}`);
+    }
+  });
+
+  const code = lines.join('\n');
+  document.getElementById('result-code').textContent = code;
+  document.getElementById('result-modal').classList.add('show');
+});
+
+document.getElementById('btn-copy').addEventListener('click', () => {
+  const text = document.getElementById('result-code').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => showCopySuccess());
+  } else {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    showCopySuccess();
+  }
+});
+
+function showCopySuccess() {
+  const btn = document.getElementById('btn-copy');
+  btn.textContent = '✅ 已复制！';
+  btn.classList.add('copy-success');
+  setTimeout(() => {
+    btn.textContent = '📋 一键复制';
+    btn.classList.remove('copy-success');
+  }, 2000);
+}
+
+document.getElementById('btn-close-modal').addEventListener('click', () => {
+  document.getElementById('result-modal').classList.remove('show');
+});
+</script>
+</body>
+</html>
