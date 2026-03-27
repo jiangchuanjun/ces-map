@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>文化生态服务地点标注</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
+<style>
+  /* 使用系统字体，避免 Google Fonts 在国内无法加载 */
+
+  :root {
+    --ink: #1a1a2e;
+    --paper: #f5f0e8;
+    --accent: #2d6a4f;
+    --accent2: #b5838d;
+    --gold: #c9a84c;
+    --light-border: rgba(45,106,79,0.2);
+    --c1: #e76f51; --c2: #2a9d8f; --c3: #8338ec;
+    --c4: #fb8500; --c5: #3a86ff; --c6: #c77dff; --c7: #06d6a0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 10px 14px 8px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  header h1 {
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #f5f0e8;
+  }
+  header p {
+    font-size: 10.5px;
+    color: rgba(245,240,232,0.65);
+    margin-top: 2px;
+    font-weight: 300;
+  }
+  .step-badge {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: var(--gold);
+    color: var(--ink);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Service Selector ── */
+  #service-bar {
+    background: #fff;
+    border-bottom: 1.5px solid var(--light-border);
+    padding: 8px 10px 6px;
+    flex-shrink: 0;
+  }
+  #service-bar .bar-label {
+    font-size: 10px;
+    color: #888;
+    margin-bottom: 5px;
+    letter-spacing: 0.03em;
+  }
+  #service-tabs {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  #service-tabs::-webkit-scrollbar { display: none; }
+
+  .stab {
+    flex-shrink: 0;
+    border: 1.5px solid currentColor;
+    background: transparent;
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    cursor: pointer;
+    transition: all 0.18s;
+    position: relative;
+  }
+  .stab.active {
+    color: #fff !important;
+    font-weight: 500;
+  }
+  .stab .dot-count {
+    display: inline-block;
+    background: rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 0 5px;
+    margin-left: 3px;
+    font-size: 10px;
+  }
+  .stab.active .dot-count { background: rgba(255,255,255,0.4); }
+
+  /* ── Map ── */
+  #map {
+    flex: 1;
+    cursor: crosshair;
+    position: relative;
+  }
+
+  /* ── Hint ── */
+  #map-hint {
+    position: absolute;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26,26,46,0.82);
+    color: #f5f0e8;
+    font-size: 11.5px;
+    padding: 7px 16px;
+    border-radius: 20px;
+    z-index: 1000;
+    pointer-events: none;
+    white-space: nowrap;
+    backdrop-filter: blur(4px);
+    transition: opacity 0.4s;
+  }
+  #map-hint.hidden { opacity: 0; }
+
+  /* ── Bottom bar ── */
+  #bottom-bar {
+    background: #fff;
+    border-top: 1.5px solid var(--light-border);
+    padding: 8px 12px;
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    align-items: center;
+  }
+  #btn-undo {
+    background: transparent;
+    border: 1.5px solid #ccc;
+    color: #666;
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  #btn-undo:hover { border-color: #999; color: #333; }
+  #btn-generate {
+    flex: 1;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 0;
+    font-size: 13px;
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: background 0.18s;
+  }
+  #btn-generate:hover { background: #235a42; }
+  #btn-generate:disabled { background: #aaa; cursor: default; }
+
+  /* ── Result Modal ── */
+  #result-modal {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(26,26,46,0.6);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(3px);
+  }
+  #result-modal.show { display: flex; }
+  .modal-card {
+    background: var(--paper);
+    border-radius: 16px;
+    padding: 22px 20px 18px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal-card h2 {
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
+    font-size: 16px;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .modal-card .sub {
+    font-size: 11.5px;
+    color: #888;
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+  #result-code {
+    background: #fff;
+    border: 1.5px solid var(--light-border);
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 11.5px;
+    font-family: 'Courier New', monospace;
+    color: var(--ink);
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 14px;
+    user-select: all;
+  }
+  .modal-btns { display: flex; gap: 8px; }
+  #btn-copy {
+    flex: 1;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+  }
+  #btn-close-modal {
+    background: transparent;
+    border: 1.5px solid #ccc;
+    color: #666;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
+    cursor: pointer;
+  }
+  .copy-success { background: #2a9d8f !important; }
+
+  /* ── Legend ── */
+  .leaflet-legend {
+    background: rgba(255,255,255,0.92);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 10.5px;
+    line-height: 1.8;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1.5px solid rgba(0,0,0,0.2);
+  }
+
+  /* ── Info popup ── */
+  .leaflet-popup-content-wrapper {
+    border-radius: 10px !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important;
+  }
+  .leaflet-popup-content { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif; font-size: 12px; }
+  .popup-del {
+    display: inline-block;
+    margin-top: 4px;
+    color: #e76f51;
+    cursor: pointer;
+    font-size: 11px;
+    text-decoration: underline;
+  }
+
+  /* progress */
+  #progress-bar {
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--gold));
+    transition: width 0.4s;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📍 文化生态服务地点标注</h1>
+  <p>请在地图上点击，标注您珍视的地点</p>
+  <div class="step-badge" id="total-count">0 / 7</div>
+</header>
+
+<div id="progress-bar" style="width:0%"></div>
+
+<div id="service-bar">
+  <div class="bar-label">▸ 选择服务类型，再在地图上点击标注（每类最多3个）</div>
+  <div id="service-tabs"></div>
+</div>
+
+<div id="map">
+  <div id="map-hint">请先选择上方的文化服务类型</div>
+</div>
+
+<div id="bottom-bar">
+  <button id="btn-undo">↩ 撤销</button>
+  <button id="btn-generate" disabled>提交标注 →</button>
+</div>
+
+<!-- Result Modal -->
+<div id="result-modal">
+  <div class="modal-card">
+    <!-- 提交中状态 -->
+    <div id="modal-loading">
+      <h2>⏳ 正在提交…</h2>
+      <p class="sub">请稍候，正在保存您的标注数据。</p>
+    </div>
+    <!-- 成功状态 -->
+    <div id="modal-success" style="display:none">
+      <h2>✅ 提交成功</h2>
+      <p class="sub">请将下方确认码<strong>手写到纸质问卷</strong>对应空格中，调查员将用此码与您的标注数据对应。</p>
+      <div id="confirm-code-display"></div>
+      <p style="font-size:11px;color:#999;margin-bottom:14px;line-height:1.6">
+        确认码已保存至后台，无需拍照或记录其他内容。
+      </p>
+      <button id="btn-done" style="
+        width:100%;background:var(--accent);color:#fff;border:none;
+        border-radius:8px;padding:11px;font-size:14px;
+        font-family:'PingFang SC','Microsoft YaHei',serif;
+        font-weight:600;cursor:pointer;letter-spacing:0.05em;">
+        完成
+      </button>
+    </div>
+    <!-- 失败状态 -->
+    <div id="modal-error" style="display:none">
+      <h2>❌ 提交失败</h2>
+      <p class="sub" id="error-msg">网络异常，请检查网络后重试。</p>
+      <div class="modal-btns">
+        <button id="btn-retry" style="
+          flex:1;background:var(--accent);color:#fff;border:none;
+          border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">
+          重试
+        </button>
+        <button id="btn-close-modal" style="
+          background:transparent;border:1.5px solid #ccc;color:#666;
+          border-radius:8px;padding:10px 14px;font-size:12px;cursor:pointer;">
+          取消
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 配置 ──
+const GITHUB_TOKEN = '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';
+const GITHUB_REPO  = 'jiangchuanjun/ces-map';
+const ISSUES_API   = `https://api.github.com/repos/${GITHUB_REPO}/issues`;
+
+const SERVICES = [
+  { id:'C1', label:'美学',    color:'#e76f51', emoji:'🌄' },
+  { id:'C2', label:'教育',    color:'#2a9d8f', emoji:'📚' },
+  { id:'C3', label:'文化遗产', color:'#8338ec', emoji:'🏛️' },
+  { id:'C4', label:'消遣娱乐', color:'#fb8500', emoji:'🎡' },
+  { id:'C5', label:'康养',    color:'#3a86ff', emoji:'🌿' },
+  { id:'C6', label:'宗教精神', color:'#c77dff', emoji:'☯️' },
+  { id:'C7', label:'科研',    color:'#06d6a0', emoji:'🔬' },
+];
+
+const MAX_PER_TYPE = 3;
+let currentService = null;
+let allMarkers = [];
+let lastPayload = null;
+
+// ── 生成确认码（排除易混淆字符 0/O/1/I/L）──
+function genCode() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+// ── Build service tabs ──
+const tabsEl = document.getElementById('service-tabs');
+SERVICES.forEach(s => {
+  const btn = document.createElement('button');
+  btn.className = 'stab';
+  btn.id = 'tab-' + s.id;
+  btn.style.color = s.color;
+  btn.style.borderColor = s.color;
+  btn.innerHTML = `${s.emoji} ${s.label} <span class="dot-count" id="cnt-${s.id}">0</span>`;
+  btn.addEventListener('click', () => selectService(s));
+  tabsEl.appendChild(btn);
+});
+
+function selectService(s) {
+  currentService = s;
+  document.querySelectorAll('.stab').forEach(b => {
+    b.classList.remove('active');
+    b.style.background = 'transparent';
+    b.style.color = SERVICES.find(x => 'tab-'+x.id === b.id)?.color || '#333';
+  });
+  const tab = document.getElementById('tab-' + s.id);
+  tab.classList.add('active');
+  tab.style.background = s.color;
+  tab.style.color = '#fff';
+  updateHint(`正在标注【${s.emoji} ${s.label}】，点击地图选择地点`);
+}
+
+// ── Init map ──
+const map = L.map('map', { center: [39.5, 116.5], zoom: 7, zoomControl: true });
+
+L.tileLayer('https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7', {
+  attribution: '© 高德地图',
+  subdomains: ['1','2','3','4'],
+  maxZoom: 18,
+}).addTo(map);
+
+const legend = L.control({ position: 'bottomright' });
+legend.onAdd = () => {
+  const div = L.DomUtil.create('div', 'leaflet-legend');
+  div.innerHTML = SERVICES.map(s =>
+    `<div class="legend-item"><div class="legend-dot" style="background:${s.color}"></div>${s.emoji} ${s.label}</div>`
+  ).join('');
+  return div;
+};
+legend.addTo(map);
+
+// ── Map click ──
+map.on('click', e => {
+  if (!currentService) {
+    updateHint('❗ 请先在上方选择文化服务类型');
+    flashHint(); return;
+  }
+  const count = allMarkers.filter(m => m.serviceId === currentService.id).length;
+  if (count >= MAX_PER_TYPE) {
+    updateHint(`【${currentService.label}】最多标注 ${MAX_PER_TYPE} 个地点`);
+    flashHint(); return;
+  }
+  addMarker(currentService, e.latlng);
+});
+
+function addMarker(service, latlng) {
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:28px;height:28px;background:${service.color};border:2.5px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.28);"></div>`,
+    iconSize: [28,28], iconAnchor: [14,28], popupAnchor: [0,-30],
+  });
+  const marker = L.marker(latlng, { icon }).addTo(map);
+  const idx = allMarkers.filter(m => m.serviceId === service.id).length + 1;
+  const id = 'mk_' + Date.now() + '_' + Math.random();
+  marker.bindPopup(`
+    <b>${service.emoji} ${service.label} #${idx}</b><br>
+    <span style="color:#888;font-size:11px">${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}</span><br>
+    <span class="popup-del">🗑 删除此点</span>
+  `);
+  marker._customId = id;
+  marker.on('popupopen', () => {
+    const el = document.querySelector('.popup-del');
+    if (el) el.onclick = () => removeMarkerById(id);
+  });
+  allMarkers.push({ id, serviceId: service.id, marker, latlng });
+  updateUI();
+}
+
+function removeMarkerById(id) {
+  const idx = allMarkers.findIndex(m => m.id === id);
+  if (idx === -1) return;
+  allMarkers[idx].marker.remove();
+  allMarkers.splice(idx, 1);
+  updateUI();
+}
+
+document.getElementById('btn-undo').addEventListener('click', () => {
+  if (allMarkers.length === 0) return;
+  const last = allMarkers.pop();
+  last.marker.remove();
+  updateUI();
+});
+
+function updateUI() {
+  SERVICES.forEach(s => {
+    const cnt = allMarkers.filter(m => m.serviceId === s.id).length;
+    document.getElementById('cnt-' + s.id).textContent = cnt;
+  });
+  const total = allMarkers.length;
+  document.getElementById('total-count').textContent = `${total} 个`;
+  const pct = Math.min(100, (total / (SERVICES.length * 2)) * 100);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('btn-generate').disabled = total === 0;
+}
+
+function updateHint(text) {
+  const h = document.getElementById('map-hint');
+  h.textContent = text;
+  h.classList.remove('hidden');
+}
+function flashHint() {
+  const h = document.getElementById('map-hint');
+  h.style.background = 'rgba(231,111,81,0.88)';
+  setTimeout(() => { h.style.background = ''; }, 1200);
+}
+map.on('click', () => {
+  if (currentService) setTimeout(() => document.getElementById('map-hint').classList.add('hidden'), 2000);
+});
+
+// ── 构建 Issue 内容 ──
+function buildPayload(code) {
+  const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+  const total = allMarkers.length;
+  const rows = SERVICES.map(s => {
+    const pts = allMarkers.filter(m => m.serviceId === s.id);
+    const coords = pts.length
+      ? pts.map((p, i) => `${s.id}P${i+1}:${p.latlng.lat.toFixed(5)},${p.latlng.lng.toFixed(5)}`).join(' | ')
+      : '—';
+    return `| ${s.emoji} ${s.label} | ${coords} |`;
+  }).join('\n');
+
+  const body = `## CES 地点标注数据\n\n`
+    + `**确认码**: \`${code}\`  \n`
+    + `**提交时间**: ${now}  \n`
+    + `**标注总数**: ${total} 个\n\n`
+    + `| 服务类型 | 坐标（WGS-84） |\n`
+    + `|---|---|\n`
+    + rows;
+
+  return { title: `[CES] 确认码: ${code}`, body };
+}
+
+// ── 提交到 GitHub Issues ──
+async function submitToGitHub(payload) {
+  const res = await fetch(ISSUES_API, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GITHUB_TOKEN}`,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── 显示确认码（大格子）──
+function showCode(code) {
+  const el = document.getElementById('confirm-code-display');
+  el.innerHTML = '';
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display:flex;gap:6px;justify-content:center;margin:16px 0;';
+  [...code].forEach(ch => {
+    const box = document.createElement('div');
+    box.style.cssText = `
+      width:38px;height:48px;
+      border:2px solid var(--accent);border-radius:8px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:22px;font-weight:700;font-family:monospace;
+      color:var(--ink);background:#fff;
+      box-shadow:0 2px 6px rgba(0,0,0,0.08);
+    `;
+    box.textContent = ch;
+    wrapper.appendChild(box);
+  });
+  el.appendChild(wrapper);
+}
+
+// ── 模态框状态切换 ──
+function showModal(state) {
+  document.getElementById('result-modal').classList.add('show');
+  document.getElementById('modal-loading').style.display = state === 'loading' ? '' : 'none';
+  document.getElementById('modal-success').style.display = state === 'success' ? '' : 'none';
+  document.getElementById('modal-error').style.display   = state === 'error'   ? '' : 'none';
+}
+function hideModal() {
+  document.getElementById('result-modal').classList.remove('show');
+}
+
+// ── 提交按钮 ──
+document.getElementById('btn-generate').addEventListener('click', async () => {
+  if (allMarkers.length === 0) return;
+  const code = genCode();
+  lastPayload = buildPayload(code);
+  showModal('loading');
+  try {
+    await submitToGitHub(lastPayload);
+    showCode(code);
+    showModal('success');
+  } catch (e) {
+    document.getElementById('error-msg').textContent = `提交失败：${e.message}，请检查网络后重试。`;
+    showModal('error');
+  }
+});
+
+// ── 重试 ──
+document.getElementById('btn-retry').addEventListener('click', async () => {
+  if (!lastPayload) return;
+  showModal('loading');
+  try {
+    await submitToGitHub(lastPayload);
+    const code = lastPayload.title.replace('[CES] 确认码: ', '');
+    showCode(code);
+    showModal('success');
+  } catch (e) {
+    document.getElementById('error-msg').textContent = `提交失败：${e.message}，请检查网络后重试。`;
+    showModal('error');
+  }
+});
+
+document.getElementById('btn-done').addEventListener('click', hideModal);
+document.getElementById('btn-close-modal').addEventListener('click', hideModal);
+</script>
+</body>
+</html>
