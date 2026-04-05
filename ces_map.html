@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>文化生态服务地点标注</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap');
+  /* 使用系统字体，避免 Google Fonts 在国内无法加载 */
 
   :root {
     --ink: #1a1a2e;
@@ -23,7 +23,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: 'Noto Sans SC', sans-serif;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
     background: var(--paper);
     color: var(--ink);
     height: 100vh;
@@ -41,7 +41,7 @@
     position: relative;
   }
   header h1 {
-    font-family: 'Noto Serif SC', serif;
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -93,7 +93,7 @@
     border-radius: 20px;
     padding: 4px 10px;
     font-size: 11px;
-    font-family: 'Noto Sans SC', sans-serif;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
     cursor: pointer;
     transition: all 0.18s;
     position: relative;
@@ -155,7 +155,7 @@
     border-radius: 8px;
     padding: 7px 12px;
     font-size: 12px;
-    font-family: 'Noto Sans SC', sans-serif;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
     cursor: pointer;
     flex-shrink: 0;
   }
@@ -168,7 +168,7 @@
     border-radius: 8px;
     padding: 9px 0;
     font-size: 13px;
-    font-family: 'Noto Serif SC', serif;
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
     font-weight: 600;
     cursor: pointer;
     letter-spacing: 0.05em;
@@ -198,7 +198,7 @@
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
   }
   .modal-card h2 {
-    font-family: 'Noto Serif SC', serif;
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
     font-size: 16px;
     color: var(--ink);
     margin-bottom: 6px;
@@ -234,7 +234,7 @@
     border-radius: 8px;
     padding: 10px;
     font-size: 13px;
-    font-family: 'Noto Serif SC', serif;
+    font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", serif;
     font-weight: 600;
     cursor: pointer;
     letter-spacing: 0.05em;
@@ -246,7 +246,7 @@
     border-radius: 8px;
     padding: 10px 14px;
     font-size: 12px;
-    font-family: 'Noto Sans SC', sans-serif;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif;
     cursor: pointer;
   }
   .copy-success { background: #2a9d8f !important; }
@@ -273,7 +273,7 @@
     border-radius: 10px !important;
     box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important;
   }
-  .leaflet-popup-content { font-family: 'Noto Sans SC', sans-serif; font-size: 12px; }
+  .leaflet-popup-content { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif; font-size: 12px; }
   .popup-del {
     display: inline-block;
     margin-top: 4px;
@@ -295,7 +295,7 @@
 <body>
 
 <header>
-  <h1>📍 文化生态服务地点标注</html>
+  <h1>📍 文化生态服务地点标注</h1>
   <p>请在地图上点击，标注您珍视的地点</p>
   <div class="step-badge" id="total-count">0 / 7</div>
 </header>
@@ -313,36 +313,140 @@
 
 <div id="bottom-bar">
   <button id="btn-undo">↩ 撤销</button>
-  <button id="btn-generate" disabled>生成坐标码 →</button>
+  <button id="btn-generate" disabled>提交标注 →</button>
 </div>
 
 <!-- Result Modal -->
 <div id="result-modal">
   <div class="modal-card">
-    <h2>✅ 坐标已生成</h2>
-    <p class="sub">请长按下方代码全选，复制后粘贴到问卷对应文本框中。</p>
-    <div id="result-code"></div>
-    <div class="modal-btns">
-      <button id="btn-copy">📋 一键复制</button>
-      <button id="btn-close-modal">返回地图</button>
+    <!-- 提交中状态 -->
+    <div id="modal-loading">
+      <h2>⏳ 正在提交…</h2>
+      <p class="sub" id="loading-msg">请稍候，正在生成唯一确认码并提交数据。</p>
+    </div>
+    <!-- 成功状态 -->
+    <div id="modal-success" style="display:none">
+      <h2>✅ 提交成功</h2>
+      <p class="sub">请将下方<strong>6位确认码手写到纸质问卷</strong>对应空格；电子问卷可点击「复制」直接粘贴。</p>
+
+      <!-- 大号格子显示确认码 -->
+      <div id="confirm-code-display"></div>
+
+      <!-- 纯文本大号备用显示，方便抄写 -->
+      <div id="confirm-code-text" style="
+        text-align:center;font-size:28px;font-weight:700;
+        font-family:monospace;letter-spacing:0.25em;
+        color:var(--ink);margin:-6px 0 10px;
+      "></div>
+
+      <p style="font-size:11px;color:#999;margin-bottom:12px;line-height:1.6;text-align:center">
+        确认码已保存至后台，手写或复制后点「完成」即可
+      </p>
+
+      <div style="display:flex;gap:8px;">
+        <button id="btn-copy-code" style="
+          flex:1;background:#fff;color:var(--accent);
+          border:2px solid var(--accent);border-radius:8px;
+          padding:11px;font-size:13px;font-weight:600;cursor:pointer;
+          font-family:'PingFang SC','Microsoft YaHei',sans-serif;">
+          📋 复制确认码
+        </button>
+        <button id="btn-done" style="
+          flex:1;background:var(--accent);color:#fff;border:none;
+          border-radius:8px;padding:11px;font-size:13px;font-weight:600;
+          cursor:pointer;font-family:'PingFang SC','Microsoft YaHei',serif;">
+          完成 ✓
+        </button>
+      </div>
+    </div>
+    <!-- 失败状态 -->
+    <div id="modal-error" style="display:none">
+      <h2>❌ 提交失败</h2>
+      <p class="sub" id="error-msg">网络异常，请检查网络后重试。</p>
+      <div class="modal-btns">
+        <button id="btn-retry" style="
+          flex:1;background:var(--accent);color:#fff;border:none;
+          border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">
+          重试
+        </button>
+        <button id="btn-close-modal" style="
+          background:transparent;border:1.5px solid #ccc;color:#666;
+          border-radius:8px;padding:10px 14px;font-size:12px;cursor:pointer;">
+          取消
+        </button>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
+// ── 配置 ──
+const GITHUB_TOKEN = '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';
+const GITHUB_OWNER = 'jiangchuanjun';
+const GITHUB_REPO  = 'ces-map';
+const ISSUES_API   = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`;
+
 const SERVICES = [
   { id:'C1', label:'美学',    color:'#e76f51', emoji:'🌄' },
   { id:'C2', label:'教育',    color:'#2a9d8f', emoji:'📚' },
   { id:'C3', label:'文化遗产', color:'#8338ec', emoji:'🏛️' },
   { id:'C4', label:'消遣娱乐', color:'#fb8500', emoji:'🎡' },
   { id:'C5', label:'康养',    color:'#3a86ff', emoji:'🌿' },
-  { id:'C6', label:'宗教精神', color:'#c77dff', emoji:'⛩️' },
+  { id:'C6', label:'宗教精神', color:'#c77dff', emoji:'☯️' },
   { id:'C7', label:'科研',    color:'#06d6a0', emoji:'🔬' },
 ];
 
 const MAX_PER_TYPE = 3;
 let currentService = null;
-let allMarkers = []; // {serviceId, marker, latlng}
+let allMarkers = [];
+let lastPayload = null;
+
+// ── 生成确认码（排除易混淆字符 0/O/1/I/L）──
+function genCode() {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+// ── 从 Gitee 获取已存在的确认码集合 ──
+async function fetchExistingCodes() {
+  const codes = new Set();
+  let page = 1;
+  while (true) {
+    const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/issues`
+      + `?state=open&per_page=100&page=${page}`;
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${GITHUB_TOKEN}`,
+          'Accept': 'application/vnd.github+json',
+        }
+      });
+      if (!res.ok) break;
+      const data = await res.json();
+      if (!data || data.length === 0) break;
+      data.forEach(i => {
+        const m = i.title.match(/确认码: ([A-Z0-9]{6})/);
+        if (m) codes.add(m[1]);
+      });
+      if (data.length < 100) break;
+      page++;
+    } catch(e) { break; }
+  }
+  return codes;
+}
+
+// ── 生成不重复的确认码 ──
+async function genUniqueCode() {
+  const existing = await fetchExistingCodes();
+  let code, attempts = 0;
+  do {
+    code = genCode();
+    attempts++;
+  } while (existing.has(code) && attempts < 20);
+  return code;
+}
 
 // ── Build service tabs ──
 const tabsEl = document.getElementById('service-tabs');
@@ -372,18 +476,14 @@ function selectService(s) {
 }
 
 // ── Init map ──
-const map = L.map('map', {
-  center: [39.5, 116.5],
-  zoom: 7,
-  zoomControl: true,
-});
+const map = L.map('map', { center: [39.5, 116.5], zoom: 7, zoomControl: true });
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors',
+L.tileLayer('https://wprd0{s}.is.autonavi.com/appmaptile?x={x}&y={y}&z={z}&lang=zh_cn&size=1&scl=1&style=7', {
+  attribution: '© 高德地图',
+  subdomains: ['1','2','3','4'],
   maxZoom: 18,
 }).addTo(map);
 
-// Legend
 const legend = L.control({ position: 'bottomright' });
 legend.onAdd = () => {
   const div = L.DomUtil.create('div', 'leaflet-legend');
@@ -398,14 +498,12 @@ legend.addTo(map);
 map.on('click', e => {
   if (!currentService) {
     updateHint('❗ 请先在上方选择文化服务类型');
-    flashHint();
-    return;
+    flashHint(); return;
   }
   const count = allMarkers.filter(m => m.serviceId === currentService.id).length;
   if (count >= MAX_PER_TYPE) {
     updateHint(`【${currentService.label}】最多标注 ${MAX_PER_TYPE} 个地点`);
-    flashHint();
-    return;
+    flashHint(); return;
   }
   addMarker(currentService, e.latlng);
 });
@@ -413,38 +511,22 @@ map.on('click', e => {
 function addMarker(service, latlng) {
   const icon = L.divIcon({
     className: '',
-    html: `<div style="
-      width:28px;height:28px;
-      background:${service.color};
-      border:2.5px solid #fff;
-      border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg);
-      box-shadow:0 2px 6px rgba(0,0,0,0.28);
-    "></div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 28],
-    popupAnchor: [0, -30],
+    html: `<div style="width:28px;height:28px;background:${service.color};border:2.5px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.28);"></div>`,
+    iconSize: [28,28], iconAnchor: [14,28], popupAnchor: [0,-30],
   });
-
   const marker = L.marker(latlng, { icon }).addTo(map);
   const idx = allMarkers.filter(m => m.serviceId === service.id).length + 1;
-
+  const id = 'mk_' + Date.now() + '_' + Math.random();
   marker.bindPopup(`
     <b>${service.emoji} ${service.label} #${idx}</b><br>
     <span style="color:#888;font-size:11px">${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}</span><br>
-    <span class="popup-del" onclick="removeMarker('${Date.now() + Math.random()}')">🗑 删除此点</span>
+    <span class="popup-del">🗑 删除此点</span>
   `);
-
-  const id = 'mk_' + Date.now() + '_' + Math.random();
   marker._customId = id;
-  marker.getPopup()._source._customId = id;
-
-  // patch delete
   marker.on('popupopen', () => {
     const el = document.querySelector('.popup-del');
     if (el) el.onclick = () => removeMarkerById(id);
   });
-
   allMarkers.push({ id, serviceId: service.id, marker, latlng });
   updateUI();
 }
@@ -486,65 +568,177 @@ function flashHint() {
   h.style.background = 'rgba(231,111,81,0.88)';
   setTimeout(() => { h.style.background = ''; }, 1200);
 }
-
-// Auto-hide hint after first click
 map.on('click', () => {
-  if (currentService) {
-    setTimeout(() => {
-      document.getElementById('map-hint').classList.add('hidden');
-    }, 2000);
+  if (currentService) setTimeout(() => document.getElementById('map-hint').classList.add('hidden'), 2000);
+});
+
+// ── 构建 Issue 内容 ──
+function buildPayload(code) {
+  const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+  const total = allMarkers.length;
+  const rows = SERVICES.map(s => {
+    const pts = allMarkers.filter(m => m.serviceId === s.id);
+    const coords = pts.length
+      ? pts.map((p, i) => `${s.id}P${i+1}:${p.latlng.lat.toFixed(5)},${p.latlng.lng.toFixed(5)}`).join(' | ')
+      : '—';
+    return `| ${s.emoji} ${s.label} | ${coords} |`;
+  }).join('\n');
+
+  const body = `## CES 地点标注数据\n\n`
+    + `**确认码**: \`${code}\`  \n`
+    + `**提交时间**: ${now}  \n`
+    + `**标注总数**: ${total} 个\n\n`
+    + `| 服务类型 | 坐标（WGS-84） |\n`
+    + `|---|---|\n`
+    + rows;
+
+  return { title: `[CES] 确认码: ${code}`, body };
+}
+
+// ── 提交到 Gitee Issues ──
+async function submitToGitHub(payload) {
+  let res;
+  try {
+    res = await fetch(ISSUES_API, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: payload.title,
+        body:  payload.body,
+      }),
+    });
+  } catch (networkErr) {
+    // fetch 本身失败（断网、CORS、超时等）
+    throw new Error('网络请求失败，请检查网络连接后重试');
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    throw new Error(`服务器响应异常（HTTP ${res.status}）`);
+  }
+
+  if (!res.ok) {
+    throw new Error(data.message || `提交失败（HTTP ${res.status}）`);
+  }
+
+  // 关键验证：Gitee 必须返回真实的 issue 编号才算成功
+  // data.number = issue编号，data.id = 全局ID，两个都检查
+  if (!data.number && !data.id) {
+    // 把实际返回内容附在错误里，方便排查
+    const hint = data.message || data.error || JSON.stringify(data).slice(0, 80);
+    throw new Error('后台未收到数据：' + hint);
+  }
+
+  return data;
+}
+
+// ── 显示确认码（大格子 + 纯文本备用）──
+let currentCode = '';
+function showCode(code) {
+  currentCode = code;
+
+  // 格子显示
+  const el = document.getElementById('confirm-code-display');
+  el.innerHTML = '';
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display:flex;gap:6px;justify-content:center;margin:16px 0 6px;';
+  [...code].forEach(ch => {
+    const box = document.createElement('div');
+    box.style.cssText = `
+      width:40px;height:52px;
+      border:2.5px solid var(--accent);border-radius:8px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:24px;font-weight:800;font-family:monospace;
+      color:var(--accent);background:#fff;
+      box-shadow:0 2px 8px rgba(45,106,79,0.15);
+    `;
+    box.textContent = ch;
+    wrapper.appendChild(box);
+  });
+  el.appendChild(wrapper);
+
+  // 纯文本备用（抄写用）
+  document.getElementById('confirm-code-text').textContent = code;
+}
+
+// ── 模态框状态切换 ──
+function showModal(state) {
+  document.getElementById('result-modal').classList.add('show');
+  document.getElementById('modal-loading').style.display = state === 'loading' ? '' : 'none';
+  document.getElementById('modal-success').style.display = state === 'success' ? '' : 'none';
+  document.getElementById('modal-error').style.display   = state === 'error'   ? '' : 'none';
+}
+function hideModal() {
+  document.getElementById('result-modal').classList.remove('show');
+}
+
+// ── 提交按钮 ──
+document.getElementById('btn-generate').addEventListener('click', async () => {
+  if (allMarkers.length === 0) return;
+  showModal('loading');
+  document.getElementById('loading-msg').textContent = '正在生成唯一确认码并提交…';
+  try {
+    const code = await genUniqueCode();   // 查重后生成
+    lastPayload = buildPayload(code);
+    await submitToGitHub(lastPayload);
+    showCode(code);
+    showModal('success');
+  } catch (e) {
+    document.getElementById('error-msg').textContent = `提交失败：${e.message}，请检查网络后重试。`;
+    showModal('error');
   }
 });
 
-// ── Generate result ──
-document.getElementById('btn-generate').addEventListener('click', () => {
-  if (allMarkers.length === 0) return;
-
-  const lines = [];
-  SERVICES.forEach(s => {
-    const pts = allMarkers.filter(m => m.serviceId === s.id);
-    if (pts.length > 0) {
-      const coords = pts.map((p, i) =>
-        `${s.id}P${i+1}:${p.latlng.lat.toFixed(5)},${p.latlng.lng.toFixed(5)}`
-      ).join(' | ');
-      lines.push(`【${s.label}】${coords}`);
-    }
-  });
-
-  const code = lines.join('\n');
-  document.getElementById('result-code').textContent = code;
-  document.getElementById('result-modal').classList.add('show');
+// ── 重试 ──
+document.getElementById('btn-retry').addEventListener('click', async () => {
+  if (!lastPayload) return;
+  showModal('loading');
+  try {
+    await submitToGitHub(lastPayload);
+    const code = lastPayload.title.replace('[CES] 确认码: ', '');
+    showCode(code);
+    showModal('success');
+  } catch (e) {
+    document.getElementById('error-msg').textContent = `提交失败：${e.message}，请检查网络后重试。`;
+    showModal('error');
+  }
 });
 
-document.getElementById('btn-copy').addEventListener('click', () => {
-  const text = document.getElementById('result-code').textContent;
+// ── 复制确认码 ──
+document.getElementById('btn-copy-code').addEventListener('click', () => {
+  if (!currentCode) return;
+  const btn = document.getElementById('btn-copy-code');
+  const copy = () => {
+    btn.textContent = '✅ 已复制！';
+    btn.style.background = '#2a9d8f';
+    btn.style.color = '#fff';
+    setTimeout(() => {
+      btn.textContent = '📋 复制确认码';
+      btn.style.background = '#fff';
+      btn.style.color = 'var(--accent)';
+    }, 2000);
+  };
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => showCopySuccess());
+    navigator.clipboard.writeText(currentCode).then(copy);
   } else {
-    // fallback
     const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    ta.value = currentCode;
+    ta.style.cssText = 'position:fixed;opacity:0';
     document.body.appendChild(ta);
     ta.select(); document.execCommand('copy');
     document.body.removeChild(ta);
-    showCopySuccess();
+    copy();
   }
 });
 
-function showCopySuccess() {
-  const btn = document.getElementById('btn-copy');
-  btn.textContent = '✅ 已复制！';
-  btn.classList.add('copy-success');
-  setTimeout(() => {
-    btn.textContent = '📋 一键复制';
-    btn.classList.remove('copy-success');
-  }, 2000);
-}
-
-document.getElementById('btn-close-modal').addEventListener('click', () => {
-  document.getElementById('result-modal').classList.remove('show');
-});
+document.getElementById('btn-done').addEventListener('click', hideModal);
+document.getElementById('btn-close-modal').addEventListener('click', hideModal);
 </script>
 </body>
 </html>
